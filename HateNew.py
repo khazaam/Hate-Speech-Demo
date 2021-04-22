@@ -49,7 +49,7 @@ def hateSearch():
         ]
     ##TODO This is just hardcoded list, might be used url instead
     hateList = [
-        'Anonymous'
+        'Anonymous',
         'allah akbar',
         'blacks',
         'chink',
@@ -238,9 +238,10 @@ def hateSearch():
         'Wikipedia is not a place for hate speech, and such bigotry'
         ]
     
+    
     for t in textFind:
         ##TODO go trought the wholelist somehow, now it only checks this one word
-        if "faggot" in hateList:
+        if any(hateList):
             ##data += '{} '.format(t)
             hatedata  += '{} '.format(t)
             print('Found some hate elements')
