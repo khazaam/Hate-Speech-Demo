@@ -12,6 +12,11 @@ import re
 from bs4 import BeautifulSoup
 import requests
 
+import nltk
+from nltk import FreqDist
+from nltk.util import ngrams
+from nltk.stem.snowball import SnowballStemmer
+
 ##testing variables
 name = "Ville"
 
@@ -44,6 +49,7 @@ def hateSearch():
         ]
     ##TODO This is just hardcoded list, might be used url instead
     hateList = [
+        'Anonymous'
         'allah akbar',
         'blacks',
         'chink',
@@ -52,9 +58,13 @@ def hateSearch():
         'faggot',
         'faggot',
         'fags',
+        'gay',
+        'gay.',
+        'GAY',
         'homo',
         'inbred',
         'nigger',
+        'nigger.',
         'niggers',
         'queers',
         'raped',
@@ -82,6 +92,9 @@ def hateSearch():
         'dumb nigger',
         'fag and',
         'fag but',
+        'Faggots',
+        'faggot',
+        'Faggot',
         'faggot a',
         'faggot and',
         'faggot ass',
@@ -222,18 +235,19 @@ def hateSearch():
         'wit a lame nigga',
         'you a lame bitch',
         'you fuck wit a',
+        'Wikipedia is not a place for hate speech, and such bigotry'
         ]
     
     for t in textFind:
-        if t.parent.name not in blacklist:
-            data += '{} '.format(t)
-            print('Deleted html elements')
-        if t.parent.name in hateList:
+        ##TODO go trought the wholelist somehow, now it only checks this one word
+        if "faggot" in hateList:
             ##data += '{} '.format(t)
             hatedata  += '{} '.format(t)
             print('Found some hate elements')
-            
-    print(hatedata)        
-    print(data)
-    
-    return data
+
+        if t.parent.name not in blacklist:
+            data += '{}'.format(t)
+            ##print(data)
+
+    print(hatedata, "hatedata")
+    return hatedata
