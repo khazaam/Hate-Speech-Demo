@@ -44,53 +44,38 @@ def clearFormat(text):
 def hateSearch(url):
     resp = requests.get(url)
 
+    ##add input word spot
+    
+    ##testing with one word at the time
+    ##if you wish to test with just one word you can change this to the word you want to find
+    testi_sana = ("subhuman")
+    
     html_page = resp.content
     soup = BeautifulSoup(html_page, 'html.parser')
     ##TODO make a similar list or file where you can get the textFind contents
     textFind = soup.find_all(text=True)
     
      ##Note,  use [] list as a finding stuff, but {} does not find any
-    hateFound = soup.body.find_all(text=re.compile('.*{0}.*'.format(hateList)),recursive=True)
+    hateFound = soup.body.find_all(text=re.compile('.*{0}.*'.format(testi_sana)),recursive=True)
     
-    print('Hate word found "{0}" {1} time\n'.format(hateList, len(hateFound)))
+    print('Hate word found "{0}" {1} time\n'.format(testi_sana, len(hateFound)))
+    
     
     for content in hateFound:
         words = content.split()
         for index, word in enumerate(words):
-            if word == hateList:
+            if word == testi_sana:
                 print('Found from: "{0}"'.format(content))
                 before = None
                 after = None
                 if index != 0:
-                    before = words[index-1] ##not sure is it index -1 or index-1
-                if index != len(words)-1:
-                    after = words[index+1]
+                    before = words[index -1] ##not sure is it index -1 or index-1
+                if index != len(words) -1:
+                    after = words[index +1]
                 print('\word before: "{0}", word after: "{1}"').format(before, after)
+                return 
 
-    data = ''
-    hatedata = ''
 
-    blacklist = [
-        '[document]',
-        'noscript',
-        'header',
-        'html',
-        'meta',
-        'head',
-        'input',
-        'script',
-        'style'
-        ]
-
-    for t in textFind:
-        ##TODO go trought the wholelist somehow, now it only checks this one word which
-        ## give false positive. It will always show if it founds something
-
-        if t.parent.name not in blacklist:
-            data += '{}'.format(t)
-            ##print(data)
-
-    return hatedata
 
 if __name__ == "__main__":
 	if(len(sys.argv) != 2):
