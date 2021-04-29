@@ -20,9 +20,6 @@ from nltk import FreqDist
 from nltk.util import ngrams
 from nltk.stem.snowball import SnowballStemmer
 
-##testing variables
-name = "Ville"
-
 ##parse hate terms from vocab
 hateList = []
 with open('./hate.json', 'r', encoding="utf-8") as file:
@@ -41,8 +38,9 @@ def clearFormat(text):
 			text = text.replace(matcher, key)
 	return text
 
-##hateSearch starts from here
 
+##hateSearch starts from here
+##Hate search is not working currectly, input works, but gives false positive everytime.
 def hateSearch(url):
     resp = requests.get(url)
 
@@ -50,8 +48,24 @@ def hateSearch(url):
     soup = BeautifulSoup(html_page, 'html.parser')
     ##TODO make a similar list or file where you can get the textFind contents
     textFind = soup.find_all(text=True)
-
-    ##TODO to parse the data what we are looking for, either manual list or make url for it
+    
+     ##Note,  use [] list as a finding stuff, but {} does not find any
+    hateFound = soup.body.find_all(text=re.compile('.*{0}.*'.format(hateList)),recursive=True)
+    
+    print('Hate word found "{0}" {1} time\n'.format(hateList, len(hateFound)))
+    
+    for content in hateFound:
+        words = content.split()
+        for index, word in enumerate(words):
+            if word == hateList:
+                print('Found from: "{0}"'.format(content))
+                before = None
+                after = None
+                if index != 0:
+                    before = words[index-1] ##not sure is it index -1 or index-1
+                if index != len(words)-1:
+                    after = words[index+1]
+                print('\word before: "{0}", word after: "{1}"').format(before, after)
 
     data = ''
     hatedata = ''
@@ -69,17 +83,13 @@ def hateSearch(url):
         ]
 
     for t in textFind:
-        ##TODO go trought the wholelist somehow, now it only checks this one word
-        if any(hateList):
-            ##data += '{} '.format(t)
-            hatedata  += '{} '.format(t)
-            print('Found some hate elements')
+        ##TODO go trought the wholelist somehow, now it only checks this one word which
+        ## give false positive. It will always show if it founds something
 
         if t.parent.name not in blacklist:
             data += '{}'.format(t)
             ##print(data)
 
-    print(hatedata, "hatedata")
     return hatedata
 
 if __name__ == "__main__":
