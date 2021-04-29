@@ -15,6 +15,9 @@ import re
 from bs4 import BeautifulSoup
 import requests
 
+import numpy
+import Levenshtein
+
 import nltk
 from nltk import FreqDist
 from nltk.util import ngrams
@@ -38,15 +41,17 @@ def jaccardSimilarity(group1, group2):
 	union = len(set(group1)) + len(set(group2)) - intersection
 	return float(intersection)/union
 
+# don't use nltk as it will give a generator which doesn't have a length which is needed
 def makeFuzzy(text):
 	return [text[i:j] for i in range(len(text)) for j in range(i + 1, len(text) + 1) if len(text[i:j]) == fuzzyLength]
 
-##hateSearch starts from here
-##Hate search is not working currectly, input works, but gives false positive everytime.
-def hateSearch(url, hateList, transformList, hateTreshold):
+# url: url where to search hate from
+def hateSearch(url, hateList, transformList, searchThreshold, verifyThreshold):
 	resp = requests.get(url)
 	html_page = resp.content
 	soup = BeautifulSoup(html_page, 'html.parser')
+	fuzzyHateList = [makeFuzzy(clearFormat(t, transformList)) for t in hateList]
+
 	# scan each html element with text
 	for text in soup.stripped_strings:
 		# skip short string, no need to scan them
@@ -58,18 +63,26 @@ def hateSearch(url, hateList, transformList, hateTreshold):
 		fuzzyText = makeFuzzy(clearedText)
 		foundHate = set()
 
-		for fuzzyHate in hateList:
-			threshold = len(fuzzyHate)/(len(fuzzyHate)+doubleOffset) * hateTreshold
+		for fuzzyHateIndex in range(len(fuzzyHateList)):
+			fuzzyHate = fuzzyHateList[fuzzyHateIndex]
+			clearHate = hateList[fuzzyHateIndex]
+			fuzzyHateLen = len(fuzzyHate)
+			threshold = fuzzyHateLen/(fuzzyHateLen+doubleOffset) * searchThreshold
 
-			if len(fuzzyText)+doubleOffset > len(fuzzyHate):
-				for i in range(len(fuzzyHate)-doubleOffset):
-					textSnippet = fuzzyText[i:i+len(fuzzyHate)+doubleOffset]
-					if jaccardSimilarity(fuzzyHate, textSnippet) >= threshold:
-						foundHate.add(clearedText[i:i+len(fuzzyHate)+doubleOffset])
+			if len(fuzzyText)+doubleOffset > fuzzyHateLen:
+				for i in range(fuzzyHateLen-doubleOffset):
+					textSnippet = fuzzyText[i:i+fuzzyHateLen+doubleOffset]
+					jaccard = jaccardSimilarity(fuzzyHate, textSnippet)
+					if jaccard >= threshold:
+						matchedPiece = clearedText[i:i+fuzzyHateLen+doubleOffset]
+						if Levenshtein.ratio(matchedPiece, clearHate) >= verifyThreshold:
+							foundHate.add(matchedPiece)
 			else:
 				# use the text fully as its short
-				if jaccardSimilarity(fuzzyHate, fuzzyText) >= threshold:
-					foundHate.add(clearedText)
+				jaccard = jaccardSimilarity(fuzzyHate, fuzzyText)
+				if jaccard >= threshold:
+					if Levenshtein.ratio(clearedText, clearHate) >= verifyThreshold:
+						foundHate.add(clearedText)
 		if len(foundHate) > 0:
 			print("Found hate in '{}': {}".format(text, list(foundHate)))
 
@@ -81,11 +94,10 @@ def readJsonFile(location):
 	return js
 
 if __name__ == "__main__":
-	if(len(sys.argv) != 3):
-		print("Invalid amount of arguments. When running the program, input 1st url to search the hate speech from and 2nd threshold to mark text as hate speech (0.0-1.0, 0.5 recommended)")
+	if(len(sys.argv) != 4):
+		print("Invalid amount of arguments. When running the program, input 1st url to search the hate speech from and 2nd threshold (fuzzy search, jaccard similarity) to mark text to be checked (0.0-1.0, 0.4 recommended) and 3rd argument to mark the threshold (0.0-1.0, 0.6 recommended) for test (edit distance)")
 	else:
 		transformList = readJsonFile('./format.json')
 		hateList = readJsonFile('./hate.json')
-		# remove formatting from hatelist
-		hateList = [makeFuzzy(clearFormat(t, transformList)) for t in hateList]
-		hateSearch(sys.argv[1], hateList, transformList, float(sys.argv[2]))
+		hateList = [clearFormat(t, transformList) for t in hateList]
+		hateSearch(sys.argv[1], hateList, transformList, float(sys.argv[2]), float(sys.argv[3]))
