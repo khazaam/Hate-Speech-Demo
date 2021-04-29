@@ -2,11 +2,12 @@
 """
 Created on Thu Apr 29 21:19:33 2021
 
-@author: peikk
+@author: peikk, Matti(Numpy)
 
 This is the manual
 word finder, or the one that finds the words from list but
 does not count nothing else but the finding and mount.
+
 """
 
 import sys
