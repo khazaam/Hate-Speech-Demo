@@ -2,7 +2,7 @@
 """
 Created on Wed Apr 21 13:08:29 2021
 
-@author: peikk
+@author: peikk, Matti
 """
 
 import sys
@@ -21,61 +21,71 @@ from nltk.util import ngrams
 from nltk.stem.snowball import SnowballStemmer
 
 ##helpers
-def clearFormat(text):
+fuzzyLength = 3
+compareOffset = 1 # offset to left & right
+doubleOffset = compareOffset*2
+
+def clearFormat(text, transformList):
 	text = text.lower()
 	for key in transformList:
 		for matcher in transformList[key]:
 			text = text.replace(matcher, key)
+	text = re.sub("[^a-z]+", "", text)
 	return text
 
+def jaccardSimilarity(group1, group2):
+	intersection = len(set(group1).intersection(set(group2)))
+	union = len(set(group1)) + len(set(group2)) - intersection
+	return float(intersection)/union
+
+def makeFuzzy(text):
+	return [text[i:j] for i in range(len(text)) for j in range(i + 1, len(text) + 1) if len(text[i:j]) == fuzzyLength]
 
 ##hateSearch starts from here
 ##Hate search is not working currectly, input works, but gives false positive everytime.
-def hateSearch(url, hateList, transformList):
-    resp = requests.get(url)
+def hateSearch(url, hateList, transformList, hateTreshold):
+	resp = requests.get(url)
+	html_page = resp.content
+	soup = BeautifulSoup(html_page, 'html.parser')
+	# scan each html element with text
+	for text in soup.stripped_strings:
+		# skip short string, no need to scan them
+		if len(text) < fuzzyLength:
+			continue
 
-    ##add input word spot
+		# remove possible text formatting
+		clearedText = clearFormat(text, transformList)
+		fuzzyText = makeFuzzy(clearedText)
+		foundHate = set()
 
-    ##testing with one word at the time
-    ##if you wish to test with just one word you can change this to the word you want to find
-    testi_sana = ("subhuman")
+		for fuzzyHate in hateList:
+			threshold = len(fuzzyHate)/(len(fuzzyHate)+doubleOffset) * hateTreshold
 
-    html_page = resp.content
-    soup = BeautifulSoup(html_page, 'html.parser')
-    ##TODO make a similar list or file where you can get the textFind contents
-    textFind = soup.find_all(text=True)
-
-     ##Note,  use [] list as a finding stuff, but {} does not find any
-    hateFound = soup.body.find_all(text=re.compile('.*{0}.*'.format(testi_sana)),recursive=True)
-
-    print('Hate word found "{0}" {1} time\n'.format(testi_sana, len(hateFound)))
-
-
-    for content in hateFound:
-        words = content.split()
-        for index, word in enumerate(words):
-            if word == testi_sana:
-                print('Found from: "{0}"'.format(content))
-                before = None
-                after = None
-                if index != 0:
-                    before = words[index -1] ##not sure is it index -1 or index-1
-                if index != len(words) -1:
-                    after = words[index +1]
-                print('\word before: "{0}", word after: "{1}"').format(before, after)
-                return
+			if len(fuzzyText)+doubleOffset > len(fuzzyHate):
+				for i in range(len(fuzzyHate)-doubleOffset):
+					textSnippet = fuzzyText[i:i+len(fuzzyHate)+doubleOffset]
+					if jaccardSimilarity(fuzzyHate, textSnippet) >= threshold:
+						foundHate.add(clearedText[i:i+len(fuzzyHate)+doubleOffset])
+			else:
+				# use the text fully as its short
+				if jaccardSimilarity(fuzzyHate, fuzzyText) >= threshold:
+					foundHate.add(clearedText)
+		if len(foundHate) > 0:
+			print("Found hate in '{}': {}".format(text, list(foundHate)))
 
 
 def readJsonFile(location):
-	js = []
+	js = None
 	with open(location, 'r', encoding="utf-8") as file:
 		js = json.load(file)
 	return js
 
 if __name__ == "__main__":
-	if(len(sys.argv) != 2):
-		print("Invalid amount of arguments. When running the program, input 1 url to search the hate speech from")
+	if(len(sys.argv) != 3):
+		print("Invalid amount of arguments. When running the program, input 1st url to search the hate speech from and 2nd threshold to mark text as hate speech (0.0-1.0, 0.5 recommended)")
 	else:
-		hateList = readJsonFile('./hate.json')
 		transformList = readJsonFile('./format.json')
-		hateSearch(sys.argv[1], hateList, transformList)
+		hateList = readJsonFile('./hate.json')
+		# remove formatting from hatelist
+		hateList = [makeFuzzy(clearFormat(t, transformList)) for t in hateList]
+		hateSearch(sys.argv[1], hateList, transformList, float(sys.argv[2]))
