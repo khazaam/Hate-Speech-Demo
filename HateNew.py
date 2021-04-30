@@ -49,15 +49,21 @@ def makeFuzzy(text):
 
 def translateToEnglish(text):
 	if len(text) > 5000:
+		print("Received a text over 5000 characters long, which cannot be processed by FREE google translate api")
+		return text
+	if len(text) <= 2:
 		return text
 	try:
-		return GoogleTranslator(target=hateListLanguage).translate(text)
-	except:
+		res = GoogleTranslator(target=hateListLanguage).translate(text)
+		if res is not None:
+			return res
+	except Exception as e:
+		print("Failed to translate text. Your google translator daily limit might be full or given text input may be invalid")
 		pass
 	return text
 
 # url: url where to search hate from
-def hateSearch(url, hateList, transformList, searchThreshold, verifyThreshold):
+def hateSearch(url, hateList, transformList, searchThreshold, verifyThreshold, useTranslation):
 	resp = requests.get(url)
 	html_page = resp.content
 	soup = BeautifulSoup(html_page, 'html.parser')
@@ -66,14 +72,16 @@ def hateSearch(url, hateList, transformList, searchThreshold, verifyThreshold):
 	# scan each html element with text
 	for text in soup.stripped_strings:
 		# skip short string, no need to scan them
-		text = translateToEnglish(text)
-		if len(text) < fuzzyLength:
+		if(useTranslation):
+			text = translateToEnglish(text)
+		if text is None or len(text) < fuzzyLength:
 			continue
 
 		# remove possible text formatting
 		clearedText = clearFormat(text, transformList)
 		fuzzyText = makeFuzzy(clearedText)
 		foundHate = set()
+		originalHate = set()
 
 		for fuzzyHateIndex in range(len(fuzzyHateList)):
 			fuzzyHate = fuzzyHateList[fuzzyHateIndex]
@@ -89,14 +97,16 @@ def hateSearch(url, hateList, transformList, searchThreshold, verifyThreshold):
 						matchedPiece = clearedText[i:i+fuzzyHateLen+doubleOffset]
 						if Levenshtein.ratio(matchedPiece, clearHate) >= verifyThreshold:
 							foundHate.add(matchedPiece)
+							originalHate.add(clearHate)
 			else:
 				# use the text fully as its short
 				jaccard = jaccardSimilarity(fuzzyHate, fuzzyText)
 				if jaccard >= threshold:
 					if Levenshtein.ratio(clearedText, clearHate) >= verifyThreshold:
 						foundHate.add(clearedText)
+						originalHate.add(clearHate)
 		if len(foundHate) > 0:
-			print("Found hate in '{}': {}".format(text, list(foundHate)))
+			print("Found hate in '{}': {} matching terms {}".format(text, list(foundHate), list(originalHate)))
 
 
 def readJsonFile(location):
@@ -106,10 +116,13 @@ def readJsonFile(location):
 	return js
 
 if __name__ == "__main__":
-	if(len(sys.argv) != 4):
-		print("Invalid amount of arguments. When running the program, input 1st url to search the hate speech from and 2nd threshold (fuzzy search, jaccard similarity) to mark text to be checked (0.0-1.0, 0.4 recommended) and 3rd argument to mark the threshold (0.0-1.0, 0.6 recommended) for test (edit distance)")
+	if(len(sys.argv) != 5):
+		print("Invalid amount of arguments. When running the program, input 1st url to search the hate speech from and 2nd threshold (fuzzy search, jaccard similarity) to mark text to be checked (0.0-1.0, 0.4 recommended) and 3rd argument to mark the threshold (0.0-1.0, 0.6 recommended) for test (edit distance). The last argument must be a boolean determining wether or not the text sould be translated")
 	else:
 		transformList = readJsonFile('./format.json')
 		hateList = readJsonFile('./hate.json')
 		hateList = [clearFormat(t, transformList) for t in hateList]
-		hateSearch(sys.argv[1], hateList, transformList, float(sys.argv[2]), float(sys.argv[3]))
+		translate = sys.argv[4].lower() in ["true", "t", "y", "yes"]
+		if translate:
+			print("Starting to process given URL. Note that the processing may be very slow due to the translation of texts")
+		hateSearch(sys.argv[1], hateList, transformList, float(sys.argv[2]), float(sys.argv[3]), translate)
