@@ -17,6 +17,7 @@ import requests
 
 import numpy
 import Levenshtein
+from deep_translator import GoogleTranslator
 
 import nltk
 from nltk import FreqDist
@@ -27,6 +28,7 @@ from nltk.stem.snowball import SnowballStemmer
 fuzzyLength = 3
 compareOffset = 1 # offset to left & right
 doubleOffset = compareOffset*2
+hateListLanguage = "en"
 
 def clearFormat(text, transformList):
 	text = text.lower()
@@ -45,6 +47,15 @@ def jaccardSimilarity(group1, group2):
 def makeFuzzy(text):
 	return [text[i:j] for i in range(len(text)) for j in range(i + 1, len(text) + 1) if len(text[i:j]) == fuzzyLength]
 
+def translateToEnglish(text):
+	if len(text) > 5000:
+		return text
+	try:
+		return GoogleTranslator(target=hateListLanguage).translate(text)
+	except:
+		pass
+	return text
+
 # url: url where to search hate from
 def hateSearch(url, hateList, transformList, searchThreshold, verifyThreshold):
 	resp = requests.get(url)
@@ -55,6 +66,7 @@ def hateSearch(url, hateList, transformList, searchThreshold, verifyThreshold):
 	# scan each html element with text
 	for text in soup.stripped_strings:
 		# skip short string, no need to scan them
+		text = translateToEnglish(text)
 		if len(text) < fuzzyLength:
 			continue
 
