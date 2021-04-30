@@ -63,6 +63,10 @@ def translateToEnglish(text):
 	return text
 
 # url: url where to search hate from
+# hateList: list of different hatewords to be searched
+# searchThreshold: threshold used to search words for matching
+# verifyThreshold: threshold used to determine if speech is hate speech
+# useTranslation: if true, forces the method to translate all texts. otherwise no translation is done
 def hateSearch(url, hateList, transformList, searchThreshold, verifyThreshold, useTranslation):
 	resp = requests.get(url)
 	html_page = resp.content
